@@ -41,7 +41,7 @@ type Comments struct {
 }
 
 func GetCommentCount(body *Page) (*Comments, error) {
-	req := httplib.Get(beego.AppConfig.String("commento") + "/api/comment/count")
+	req := httplib.Get(os.Getenv("commento") + "/api/comment/count")
 	req, err := req.JSONBody(body)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func GetCommentCount(body *Page) (*Comments, error) {
 
 }
 func CreateUser(body *Commenter) error {
-	req := httplib.Post(beego.AppConfig.String("commento") + "/api/commenter/new")
+	req := httplib.Post(os.Getenv("commento") + "/api/commenter/new")
 	req, err := req.JSONBody(body)
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func CreateUser(body *Commenter) error {
 
 func Login(body *Request) (*CommenterSession, error) {
 
-	req := httplib.Post(beego.AppConfig.String("commento") + "/api/commenter/login")
+	req := httplib.Post(os.Getenv("commento") + "/api/commenter/login")
 	req, err := req.JSONBody(body)
 	if err != nil {
 		return nil, err

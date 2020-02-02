@@ -3,8 +3,9 @@ package email
 import (
 	"errors"
 	"net/mail"
+	"os"
+	"strconv"
 
-	"github.com/astaxie/beego"
 	"github.com/go-gomail/gomail"
 	"github.com/matcornic/hermes"
 )
@@ -35,21 +36,25 @@ var smtpConfig smtpAuthentication
 func init() {
 	herme = hermes.Hermes{
 		Product: hermes.Product{
-			Name: beego.AppConfig.String("APP_NAME"),
-			Link: beego.AppConfig.String("APP_LINK"),
-			Logo: beego.AppConfig.String("APP_IMAGE"),
+			Name: os.Getenv("APP_NAME"),
+			Link: os.Getenv("APP_LINK"),
+			Logo: os.Getenv("APP_IMAGE"),
 		},
 	}
 	herme.Theme = new(hermes.Flat)
 
-	port, _ := beego.AppConfig.Int("HERMES_SMTP_PORT")
+	portStr, _ := os.Getenv("HERMES_SMTP_PORT")
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		panic(err)
+	}
 	smtpConfig = smtpAuthentication{
-		Server:         beego.AppConfig.String("HERMES_SMTP_SERVER"),
+		Server:         os.Getenv("HERMES_SMTP_SERVER"),
 		Port:           port,
-		SenderEmail:    beego.AppConfig.String("HERMES_SENDER_EMAIL"),
-		SenderIdentity: beego.AppConfig.String("HERMES_SENDER_IDENTITY"),
-		SMTPPassword:   beego.AppConfig.String("HERMES_SMTP_PASSWORD"),
-		SMTPUser:       beego.AppConfig.String("HERMES_SMTP_USER"),
+		SenderEmail:    os.Getenv("HERMES_SENDER_EMAIL"),
+		SenderIdentity: os.Getenv("HERMES_SENDER_IDENTITY"),
+		SMTPPassword:   os.Getenv("HERMES_SMTP_PASSWORD"),
+		SMTPUser:       os.Getenv("HERMES_SMTP_USER"),
 	}
 }
 func SendWelcomeEmail(email string, username string, link string) error {
