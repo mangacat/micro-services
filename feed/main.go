@@ -31,7 +31,7 @@ type SeriesChapters struct {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	log.Print("helloworld: received a request")
+	log.Print("feed-srv: received a request")
 	if r.Method == "GET" {
 		// create a client (safe to share across requests)
 		client := graphql.NewClient(os.Getenv("HASURA_URL"))
@@ -80,7 +80,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, chapter := range respData.SeriesChapters {
-			fmt.Println(chapter)
 			var title string
 			if chapter.SeriesChaptersSeries.Name != "" {
 				title = title + fmt.Sprintf("%s ", chapter.SeriesChaptersSeries.Name)
@@ -94,7 +93,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			if chapter.Title != "" {
 				title = title + fmt.Sprintf("- %s", chapter.Title)
 			}
-			fmt.Println(title)
 
 			item := &feeds.Item{
 				Title:       title,
@@ -111,6 +109,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Url Param 'key' is missing")
 			return
 		}
+		fmt.Println(keys)
 
 		switch keys[0] {
 		case "atom":
@@ -132,7 +131,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	log.Print("helloworld: starting server...")
+	log.Print("feed-srv: starting server...")
 
 	http.HandleFunc("/chapters", handler)
 
