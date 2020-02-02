@@ -60,8 +60,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// set any variables
 		// req.Var("key", "value")
 
-		// set header fields
-		req.Header.Set("Cache-Control", "no-cache")
 		req.Header.Set("x-hasura-admin-secret", os.Getenv("HASURA_ADMIN_SECRET"))
 
 		// define a Context for the request
