@@ -106,7 +106,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 
 	events "github.com/mangacat/micro-services/event-structs/email"
 	"github.com/mangacat/micro-services/utils/config"
@@ -127,6 +129,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Welcome, %!", r.URL.Path[1:])
 }
 func main() {
+	log.Print("helloworld: starting server...")
+
 	config := config.NewConfig()
 	// if err != nil {
 	// panic(err)
@@ -134,5 +138,11 @@ func main() {
 	fmt.Println(config)
 	http.HandleFunc("/", handler)
 	// http.HandleFunc("/about/", about)
-	http.ListenAndServe(":8080", nil)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("helloworld: listening on port %s", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
