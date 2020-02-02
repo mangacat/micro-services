@@ -11,3 +11,9 @@ spec:
           env:
             - name: TARGET
               value: "Go Sample v1"
+            - name: HASURA_ADMIN_SECRET
+              value: ""
+            - name: MANGA_FRONTEND_URL
+              value: ""
+            - name: HASURA_ADMIN_SECRET
+              value: ""

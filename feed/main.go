@@ -34,7 +34,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Print("helloworld: received a request")
 	if r.Method == "GET" {
 		// create a client (safe to share across requests)
-		client := graphql.NewClient("")
+		client := graphql.NewClient(os.Getenv("HASURA_URL"))
 
 		// make a request
 		req := graphql.NewRequest(`
@@ -62,7 +62,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		// set header fields
 		req.Header.Set("Cache-Control", "no-cache")
-		req.Header.Set("x-hasura-admin-secret", "")
+		req.Header.Set("x-hasura-admin-secret", os.Getenv("HASURA_ADMIN_SECRET"))
 
 		// define a Context for the request
 		ctx := context.Background()
@@ -76,7 +76,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		feed := &feeds.Feed{
 			Title:       "Manga Cat Recent Chapters",
-			Link:        &feeds.Link{Href: "https://rss.manga.cat/v1/rss"},
+			Link:        &feeds.Link{Href: "https://rss."},
 			Description: "Manga Cat Recent Chapters",
 			Created:     now,
 		}
@@ -101,34 +101,36 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			item := &feeds.Item{
 				Title:       title,
 				Description: title,
-				Link:        &feeds.Link{Href: fmt.Sprintf("https://manga.cat/read/%s", chapter.Hash)},
+				Link:        &feeds.Link{Href: fmt.Sprintf("%s/read/%s", os.Getenv("MANGA_FRONTEND_URL"), chapter.Hash)},
 				Created:     chapter.TimeUploaded,
 			}
 			feed.Items = append(feed.Items, item)
 		}
-		// switch c.GetString("type") {
-		// case "atom":
-		// 	if err := feed.WriteAtom(w); err != nil {
-		// 		panic(err)
-		// 	}
-		// case "json":
-		// 	if err := feed.WriteJSON(w); err != nil {
-		// 		panic(err)
-		// 	}
-		// case "rss":
-		// default:
-		if err := feed.WriteAtom(w); err != nil {
-			panic(err)
+
+		keys, ok := r.URL.Query()["type"]
+
+		if !ok || len(keys[0]) < 1 {
+			log.Println("Url Param 'key' is missing")
+			return
 		}
-		// }
+
+		switch keys[0] {
+		case "atom":
+			if err := feed.WriteAtom(w); err != nil {
+				log.Println(err)
+			}
+		case "json":
+			if err := feed.WriteJSON(w); err != nil {
+				log.Println(err)
+			}
+		case "rss":
+		default:
+			if err := feed.WriteRss(w); err != nil {
+				log.Println(err)
+			}
+		}
 
 	}
-	// target := os.Getenv("TARGET")
-	// if target == "" {
-	// 	target = "World"
-	// }
-
-	// // fmt.Fprintf(w, "Hello %s!\n", target)
 }
 
 func main() {
