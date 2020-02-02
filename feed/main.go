@@ -34,7 +34,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Print("helloworld: received a request")
 	if r.Method == "GET" {
 		// create a client (safe to share across requests)
-		client := graphql.NewClient("http://qkg7t3nssg.lb.c1.gra.k8s.ovh.net/v1/graphql")
+		client := graphql.NewClient("")
 
 		// make a request
 		req := graphql.NewRequest(`
