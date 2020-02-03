@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/Machiel/slugify"
+	"github.com/go-http-utils/etag"
+	"github.com/gorilla/mux"
 	"github.com/machinebox/graphql"
 
 	"github.com/mangacat/micro-services/utils/langs"
@@ -83,8 +85,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	// make a request
 	req := graphql.NewRequest(`
-			query {
-				series_chapters(limit: 1, where: {hash: {_eq: "batoto/comics/2014/08/01/m/read53dbf431caa79"}}) {
+			query($key: Int!,) {
+				series_chapters(limit: 1, where: {id: {_eq: $key}, published: {_eq: true}}) {
 					id
 					hash
 					language
@@ -136,8 +138,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			}
 		`)
 
+	vars := mux.Vars(r)
+	hash := vars["hash"]
+	hashInt, err := strconv.Atoi(hash)
 	// set any variables
-	// req.Var("key", "value")
+	req.Var("key", hashInt)
 
 	req.Header.Set("x-hasura-admin-secret", os.Getenv("HASURA_ADMIN_SECRET"))
 
@@ -301,13 +306,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Last-Modified", time.Now().AddDate(0, 0, -1).Format(http.TimeFormat))
+	w.Header().Set("Expires", time.Now().Add(time.Minute*5).Format(http.TimeFormat))
+	w.Header().Set("Cache-Control", "public, must-revalidate, max-age=240")
 	w.Write(b)
 }
 
 func main() {
 	log.Print("helloworld: starting server...")
-
-	http.HandleFunc("/", handler)
+	r := mux.NewRouter()
+	r.HandleFunc("/api/v1/series_chapters/{hash}", handler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -315,5 +323,5 @@ func main() {
 	}
 
 	log.Printf("helloworld: listening on port %s", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), etag.Handler(r, false)))
 }
