@@ -1,51 +1,3 @@
-// v, err := models.GetSeriesChaptersById(id)
-// if err != nil {
-// 	c.Data["json"] = err.Error()
-// 	c.Ctx.Output.SetStatus(404)
-// 	c.ServeJSON()
-// 	return
-// } else {
-// 	if !v.Uploaded {
-// 		c.Data["json"] = "Error not published"
-// 		c.Ctx.Output.SetStatus(401)
-// 		c.ServeJSON()
-// 	}
-// 	if match := c.Ctx.Input.Header("If-Modified-Since"); match != "" {
-// 		last, err := time.Parse(http.TimeFormat, match)
-// 		if err == nil {
-
-// 			if last == v.Updated {
-// 				c.Ctx.Output.SetStatus(http.StatusNotModified)
-// 				return
-// 			}
-// 		}
-// 	}
-
-// 		if b, err := json.Marshal(web); err != nil {
-// 			log.Fatal(err)
-// 		} else {
-// 			if err := cache.Put(cacheName, b, time.Hour*24); err != nil {
-// 				log.Println(err)
-// 			}
-// 			logs.Debug("Write cache: " + cacheName)
-// 		}
-// 		models.AddChapterViews(view)
-// 		if v, err := models.GetSeriesById(v.Series.Id); err == nil {
-// 			es.UpdateSeriesById(v)
-// 		}
-
-// 	}()
-// 	logs.Critical(web)
-
-// 	c.Ctx.ResponseWriter.Header().Set("Last-Modified", v.Updated.Format(http.TimeFormat))
-// 	c.Ctx.ResponseWriter.Header().Set("Expires", time.Now().Add(time.Minute*5).Format(http.TimeFormat))
-// 	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/json; charset=utf-8")
-// 	c.Ctx.ResponseWriter.Header().Set("Etag", etags.Generate(cacheName, true))
-// 	c.Ctx.ResponseWriter.Header().Set("Cache-Control", "public, must-revalidate, max-age=240")
-// 	if err := json.NewEncoder(c.Ctx.ResponseWriter).Encode(web); err != nil {
-// 		panic(err)
-// 	}
-
 package main
 
 import (
@@ -63,9 +15,6 @@ import (
 
 	"github.com/Machiel/slugify"
 	"github.com/machinebox/graphql"
-
-	// "gitlab.com/MangaSh/manga/utils/langs"
-	// "gitlab.com/MangaSh/manga/utils/truncate"
 
 	"github.com/mangacat/micro-services/utils/langs"
 	"github.com/mangacat/micro-services/utils/truncate"
