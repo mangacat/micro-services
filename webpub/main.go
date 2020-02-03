@@ -149,14 +149,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err := client.Run(ctx, req, &respData); err != nil {
 		log.Fatal(err)
 	}
-	// fmt.Println(respData)
 	if len(respData.SeriesChapters) == 0 {
 		log.Fatal("not found")
 		return
 	}
 	chapter := respData.SeriesChapters[0]
-	// fmt.Println(chapter)
-	// fmt.Println(chapter.SeriesChaptersSeries.TagsSeries)
 
 	if len(chapter.SeriesChaptersSeries.TagsSeries) != 0 {
 
