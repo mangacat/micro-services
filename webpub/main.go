@@ -76,23 +76,33 @@ type SeriesChapters struct {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	var metadata *webpub.WebPubMetadata
-	var authors []*webpub.SchemaThing
-	var artists []*webpub.SchemaThing
-	var translators []*webpub.SchemaThing
-	var genres []*webpub.WebPubSubject
+	vars := mux.Vars(r)
+	hash := vars["hash"]
+
+	hashInt, err := strconv.Atoi(hash)
+	if err != nil {
+		log.Println(err)
+	}
+
 	client := graphql.NewClient(os.Getenv("HASURA_URL"))
 
 	// make a request
 	req := graphql.NewRequest(`
-			query($key: Int!,) {
+			query($key: Int!) {
 				series_chapters(limit: 1, where: {id: {_eq: $key}, published: {_eq: true}}) {
 					id
 					hash
 					language
+					chapter_number_volume
+					chapter_number_absolute
+					volume_number
+					time_uploaded
+					title
+					published
 					series_chapters_series {
 						name
 						id
+						direction
 						cover_image
 						description
 						tags_series {
@@ -108,24 +118,19 @@ func handler(w http.ResponseWriter, r *http.Request) {
 							name
 							}
 						}
-						direction
 					}
-					chapter_number_volume
-					chapter_number_absolute
-					volume_number
-					time_uploaded
-					title
+
 					series_chapters_files(order_by: {order: asc}) {
-					hash
-					extension
-					batoto
-					type
-					uuid
-					width
-					height
-					id
-					created
-					order
+						hash
+						extension
+						batoto
+						type
+						uuid
+						width
+						height
+						id
+						created
+						order
 					}
 					groups_series_chapters {
 						groups_scanlation_series_chapters_groups {
@@ -133,14 +138,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 							id
 						}
 					}
-					published
 				}
 			}
 		`)
 
-	vars := mux.Vars(r)
-	hash := vars["hash"]
-	hashInt, err := strconv.Atoi(hash)
 	// set any variables
 	req.Var("key", hashInt)
 
@@ -154,16 +155,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err := client.Run(ctx, req, &respData); err != nil {
 		log.Fatal(err)
 	}
+
 	if len(respData.SeriesChapters) == 0 {
 		log.Fatal("not found")
 		return
 	}
+
 	chapter := respData.SeriesChapters[0]
 
-	if len(chapter.SeriesChaptersSeries.TagsSeries) != 0 {
+	var genres []*webpub.WebPubSubject
 
+	if len(chapter.SeriesChaptersSeries.TagsSeries) != 0 {
 		for _, l := range chapter.SeriesChaptersSeries.TagsSeries {
-			// fmt.Println(l)
 			k := &webpub.WebPubSubject{
 				Name: l.TagsSeries.TagName,
 				Code: l.TagsSeries.TagNamespace,
@@ -171,6 +174,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			genres = append(genres, k)
 		}
 	}
+
+	var authors []*webpub.SchemaThing
+	var artists []*webpub.SchemaThing
+
 	if len(chapter.SeriesChaptersSeries.PeopleSeries) != 0 {
 		for _, l := range chapter.SeriesChaptersSeries.PeopleSeries {
 			k := &webpub.SchemaThing{
@@ -185,6 +192,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var translators []*webpub.SchemaThing
+
 	if len(chapter.GroupsSeriesChapters) != 0 {
 		for _, l := range chapter.GroupsSeriesChapters {
 			k := &webpub.SchemaThing{
@@ -192,14 +201,15 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				Identifier: "/groups/" + string(l.GroupsScanlationSeriesChaptersGroups.ID),
 			}
 			translators = append(translators, k)
-
 		}
 	}
+
 	issue, err := strconv.ParseFloat(chapter.ChapterNumberAbsolute, 64)
 	if err != nil {
 		log.Println(err)
 		issue = 0
 	}
+
 	var title string
 	if chapter.VolumeNumber != "" {
 		title = title + fmt.Sprintf("Vol %s ", chapter.VolumeNumber)
@@ -223,6 +233,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		description = truncate.TruncateString(description, 200)
 	}
 
+	var metadata *webpub.WebPubMetadata
 	metadata = &webpub.WebPubMetadata{
 
 		Title:                title,
@@ -233,7 +244,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Expires:              time.Now().Add(time.Hour * 3),
 		Published:            chapter.TimeUploaded,
 		Free:                 true,
-		Provider:             "manga.sh",
+		Provider:             os.Getenv("MANGA_PROVIDER"),
 		BelongsTo:            &webpub.WebPubOwnership{},
 		PageCount:            uint64(len(chapter.SeriesChaptersFiles)),
 		Image:                chapter.SeriesChaptersSeries.CoverImage,
@@ -247,6 +258,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		AccessMode:           "visual",
 		AccessibilityControl: []string{"fullKeyboardControl", "fullMouseControl", "fullTouchControl"},
 	}
+
 	if chapter.SeriesChaptersSeries.Direction == "ttb" {
 		metadata.Rendition = &webpub.WebPubRendition{
 			Overflow: "scrolled-continuous",
@@ -265,7 +277,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Name:       chapter.SeriesChaptersSeries.Name,
 		Identifier: fmt.Sprintf("%s/series/%d/%s", os.Getenv("APP_LINK"), chapter.SeriesChaptersSeries.ID, slugify.Slugify(chapter.SeriesChaptersSeries.Name)),
 	})
-	fmt.Println(metadata)
 
 	var pages []*webpub.WebPubLink
 	for _, k := range chapter.SeriesChaptersFiles {
@@ -274,26 +285,24 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			Width:  uint(k.Width),
 			Height: uint(k.Height),
 		}
+
 		if k.Batoto {
 			hash := strings.Replace(chapter.Hash, "comics/", "", -1)
 			link.Link = fmt.Sprintf("%s%s/%s", os.Getenv("cdn_url"), hash, k.UUID)
 		} else {
-
 			link.Link = fmt.Sprintf("%schapters/%s/%s", os.Getenv("cdn_url"), chapter.Hash, k.UUID)
 		}
+
 		pages = append(pages, link)
 
 	}
-	// view := &models.ChapterViews{
-	// 	Chapter:   v,
-	// 	TimeStamp: time.Now(),
-	// }
 	var links []*webpub.WebPubLink
 	links = append(links, &webpub.WebPubLink{
 		Relation: "self",
 		Link:     fmt.Sprintf("%s/series_chapters/%d", os.Getenv("cdn_url"), chapter.ID),
 		Type:     "application/webpub+json",
 	})
+
 	links = append(links, &webpub.WebPubLink{
 		Relation: "cover",
 		Link:     chapter.SeriesChaptersSeries.CoverImage,
@@ -301,10 +310,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	web := webpub.GenerateComicIssueWebPub(metadata, links, pages)
+
 	b, err := json.Marshal(web)
 	if err != nil {
 		log.Println(err)
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Last-Modified", time.Now().AddDate(0, 0, -1).Format(http.TimeFormat))
 	w.Header().Set("Expires", time.Now().Add(time.Minute*5).Format(http.TimeFormat))
@@ -314,6 +325,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	log.Print("helloworld: starting server...")
+
 	r := mux.NewRouter()
 	r.HandleFunc("/api/v1/series_chapters/{hash}", handler)
 
