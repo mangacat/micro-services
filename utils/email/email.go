@@ -43,7 +43,7 @@ func init() {
 	}
 	herme.Theme = new(hermes.Flat)
 
-	portStr, _ := os.Getenv("HERMES_SMTP_PORT")
+	portStr := os.Getenv("HERMES_SMTP_PORT")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		panic(err)
