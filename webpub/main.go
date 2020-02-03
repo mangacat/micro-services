@@ -49,6 +49,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
@@ -60,8 +62,67 @@ import (
 	"time"
 
 	"github.com/Machiel/slugify"
+	"github.com/machinebox/graphql"
+
+	// "gitlab.com/MangaSh/manga/utils/langs"
+	// "gitlab.com/MangaSh/manga/utils/truncate"
+
+	"github.com/mangacat/micro-services/utils/langs"
+	"github.com/mangacat/micro-services/utils/truncate"
 	"github.com/mangacat/micro-services/utils/webpub"
 )
+
+type SeriesChapters struct {
+	SeriesChapters []struct {
+		ID                   int    `json:"id"`
+		Hash                 string `json:"hash"`
+		Language             string `json:"language"`
+		SeriesChaptersSeries struct {
+			Name        string `json:"name"`
+			ID          int    `json:"id"`
+			CoverImage  string `json:"cover_image"`
+			Description string `json:"description"`
+			TagsSeries  []struct {
+				TagsSeries struct {
+					TagName      string `json:"tag_name"`
+					TagNamespace string `json:"tag_namespace"`
+				} `json:"tags_series"`
+			} `json:"tags_series"`
+			PeopleSeries []struct {
+				PeopleSeries struct {
+					ID               int    `json:"id"`
+					AlternativeNames string `json:"alternative_names"`
+					Name             string `json:"name"`
+				} `json:"people_series"`
+			} `json:"people_series"`
+			Direction string `json:"direction"`
+		} `json:"series_chapters_series"`
+		ChapterNumberVolume   string    `json:"chapter_number_volume"`
+		ChapterNumberAbsolute string    `json:"chapter_number_absolute"`
+		VolumeNumber          string    `json:"volume_number"`
+		TimeUploaded          time.Time `json:"time_uploaded"`
+		Title                 string    `json:"title"`
+		SeriesChaptersFiles   []struct {
+			Hash      string    `json:"hash"`
+			Extension string    `json:"extension"`
+			Batoto    bool      `json:"batoto"`
+			Type      string    `json:"type"`
+			UUID      string    `json:"uuid"`
+			Width     int       `json:"width"`
+			Height    int       `json:"height"`
+			ID        int       `json:"id"`
+			Created   time.Time `json:"created"`
+			Order     int       `json:"order"`
+		} `json:"series_chapters_files"`
+		GroupsSeriesChapters []struct {
+			GroupsScanlationSeriesChaptersGroups struct {
+				Name string `json:"name"`
+				ID   int    `json:"id"`
+			} `json:"groups_scanlation_series_chapters_groups"`
+		} `json:"groups_series_chapters"`
+		Published bool `json:"published"`
+	} `json:"series_chapters"`
+}
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	var metadata *webpub.WebPubMetadata
@@ -69,67 +130,146 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var artists []*webpub.SchemaThing
 	var translators []*webpub.SchemaThing
 	var genres []*webpub.WebPubSubject
+	client := graphql.NewClient(os.Getenv("HASURA_URL"))
 
-	if len(v.Series.Tags) != 0 {
+	// make a request
+	req := graphql.NewRequest(`
+			query {
+				series_chapters(limit: 1, where: {hash: {_eq: "batoto/comics/2014/08/01/m/read53dbf431caa79"}}) {
+					id
+					hash
+					language
+					series_chapters_series {
+						name
+						id
+						cover_image
+						description
+						tags_series {
+							tags_series {
+							tag_name
+							tag_namespace
+							}
+						}
+						people_series {
+							people_series {
+							id
+							alternative_names
+							name
+							}
+						}
+						direction
+					}
+					chapter_number_volume
+					chapter_number_absolute
+					volume_number
+					time_uploaded
+					title
+					series_chapters_files(order_by: {order: asc}) {
+					hash
+					extension
+					batoto
+					type
+					uuid
+					width
+					height
+					id
+					created
+					order
+					}
+					groups_series_chapters {
+						groups_scanlation_series_chapters_groups {
+							name
+							id
+						}
+					}
+					published
+				}
+			}
+		`)
 
-		for _, l := range v.Series.Tags {
+	// set any variables
+	// req.Var("key", "value")
+
+	req.Header.Set("x-hasura-admin-secret", os.Getenv("HASURA_ADMIN_SECRET"))
+
+	// define a Context for the request
+	ctx := context.Background()
+
+	// run it and capture the response
+	var respData SeriesChapters
+	if err := client.Run(ctx, req, &respData); err != nil {
+		log.Fatal(err)
+	}
+	// fmt.Println(respData)
+	if len(respData.SeriesChapters) == 0 {
+		log.Fatal("not found")
+		return
+	}
+	chapter := respData.SeriesChapters[0]
+	// fmt.Println(chapter)
+	// fmt.Println(chapter.SeriesChaptersSeries.TagsSeries)
+
+	if len(chapter.SeriesChaptersSeries.TagsSeries) != 0 {
+
+		for _, l := range chapter.SeriesChaptersSeries.TagsSeries {
+			// fmt.Println(l)
 			k := &webpub.WebPubSubject{
-				Name: l.TagName,
-				Code: l.TagNamespace,
+				Name: l.TagsSeries.TagName,
+				Code: l.TagsSeries.TagNamespace,
 			}
 			genres = append(genres, k)
 		}
 	}
-	if len(v.Series.People) != 0 {
-
-		for _, v := range v.Series.People {
+	if len(chapter.SeriesChaptersSeries.PeopleSeries) != 0 {
+		for _, l := range chapter.SeriesChaptersSeries.PeopleSeries {
 			k := &webpub.SchemaThing{
 				SchemaType: "Person",
-				Name:       v.People.Name,
-				Alt:        v.People.AlternativeNames,
-				Identifier: string(v.Id),
-				Url:        "/people/" + string(v.Series.Id),
+				Name:       l.PeopleSeries.Name,
+				Alt:        l.PeopleSeries.AlternativeNames,
+				Identifier: string(l.PeopleSeries.ID),
+				Url:        "/people/" + string(chapter.SeriesChaptersSeries.ID),
 			}
 			authors = append(authors, k)
 
 		}
 	}
 
-	if len(v.Groups) != 0 {
-		for _, v := range v.Groups {
+	if len(chapter.GroupsSeriesChapters) != 0 {
+		for _, l := range chapter.GroupsSeriesChapters {
 			k := &webpub.SchemaThing{
-				Name:       v.Name,
-				Identifier: "/groups/" + string(v.Id),
+				Name:       l.GroupsScanlationSeriesChaptersGroups.Name,
+				Identifier: "/groups/" + string(l.GroupsScanlationSeriesChaptersGroups.ID),
 			}
 			translators = append(translators, k)
 
 		}
 	}
-	issue, err := strconv.ParseFloat(v.ChapterNumberAbsolute, 64)
+	issue, err := strconv.ParseFloat(chapter.ChapterNumberAbsolute, 64)
 	if err != nil {
 		log.Println(err)
 		issue = 0
 	}
 	var title string
-	if v.VolumeNumber != "" {
-		title = title + fmt.Sprintf("Vol %s ", v.VolumeNumber)
+	if chapter.VolumeNumber != "" {
+		title = title + fmt.Sprintf("Vol %s ", chapter.VolumeNumber)
 	}
-	if v.ChapterNumberVolume != "" {
-		title = title + fmt.Sprintf("Ch %s ", v.ChapterNumberVolume)
+	if chapter.ChapterNumberVolume != "" {
+		title = title + fmt.Sprintf("Ch %s ", chapter.ChapterNumberVolume)
 	}
-	if v.Title != "" && v.ChapterNumberVolume == "" && v.VolumeNumber == "" {
+	if chapter.Title != "" && chapter.ChapterNumberVolume == "" && chapter.VolumeNumber == "" {
 
-		title = title + fmt.Sprintf("%s", v.Title)
+		title = title + fmt.Sprintf("%s", chapter.Title)
 	}
-	if v.Title != "" {
-		title = title + fmt.Sprintf("- %s", v.Title)
+	if chapter.Title != "" {
+		title = title + fmt.Sprintf("- %s", chapter.Title)
 	}
 	if title == "" {
-		title = v.Series.Name
+		title = chapter.SeriesChaptersSeries.Name
 	}
 
-	if len(v.Series.Description) > 200 {
-		v.Series.Description = truncate.TruncateString(v.Series.Description, 200)
+	description := chapter.SeriesChaptersSeries.Description
+	if len(chapter.SeriesChaptersSeries.Description) > 200 {
+		description = truncate.TruncateString(description, 200)
 	}
 
 	metadata = &webpub.WebPubMetadata{
@@ -137,26 +277,26 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Title:                title,
 		Subtitle:             title,
 		IssueNumber:          issue,
-		Identifier:           "urn:uuid:" + v.Hash,
-		Description:          v.Series.Description,
+		Identifier:           "urn:uuid:" + chapter.Hash,
+		Description:          description,
 		Expires:              time.Now().Add(time.Hour * 3),
-		Published:            v.TimeUploaded,
+		Published:            chapter.TimeUploaded,
 		Free:                 true,
 		Provider:             "manga.sh",
 		BelongsTo:            &webpub.WebPubOwnership{},
-		PageCount:            uint64(len(v.Files)),
-		Image:                v.Series.CoverImage,
+		PageCount:            uint64(len(chapter.SeriesChaptersFiles)),
+		Image:                chapter.SeriesChaptersSeries.CoverImage,
 		Author:               authors,
 		Artist:               artists,
 		Translator:           translators,
-		Language:             langs.Langs[v.Language],
+		Language:             langs.Langs[chapter.Language],
 		Genre:                genres,
-		Direction:            v.Series.Direction,
+		Direction:            chapter.SeriesChaptersSeries.Direction,
 		AccessibilitySummary: "Sequence of images containing drawings with text",
 		AccessMode:           "visual",
 		AccessibilityControl: []string{"fullKeyboardControl", "fullMouseControl", "fullTouchControl"},
 	}
-	if v.Series.Direction == "ttb" {
+	if chapter.SeriesChaptersSeries.Direction == "ttb" {
 		metadata.Rendition = &webpub.WebPubRendition{
 			Overflow: "scrolled-continuous",
 			Fit:      "width",
@@ -171,23 +311,24 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	metadata.BelongsTo = &webpub.WebPubOwnership{}
 	metadata.BelongsTo.Series = append(metadata.BelongsTo.Series, &webpub.WebPubOwner{
-		Name:       v.Series.Name,
-		Identifier: fmt.Sprintf("%s/series/%d/%s", os.Getenv("APP_LINK"), v.Series.Id, slugify.Slugify(v.Series.Name)),
+		Name:       chapter.SeriesChaptersSeries.Name,
+		Identifier: fmt.Sprintf("%s/series/%d/%s", os.Getenv("APP_LINK"), chapter.SeriesChaptersSeries.ID, slugify.Slugify(chapter.SeriesChaptersSeries.Name)),
 	})
+	fmt.Println(metadata)
 
 	var pages []*webpub.WebPubLink
-	for _, k := range v.Files {
+	for _, k := range chapter.SeriesChaptersFiles {
 		link := &webpub.WebPubLink{
 			Type:   k.Type,
 			Width:  uint(k.Width),
 			Height: uint(k.Height),
 		}
 		if k.Batoto {
-			hash := strings.Replace(v.Hash, "comics/", "", -1)
+			hash := strings.Replace(chapter.Hash, "comics/", "", -1)
 			link.Link = fmt.Sprintf("%s%s/%s", os.Getenv("cdn_url"), hash, k.UUID)
 		} else {
 
-			link.Link = fmt.Sprintf("%schapters/%s/%s", os.Getenv("cdn_url"), v.Hash, k.UUID)
+			link.Link = fmt.Sprintf("%schapters/%s/%s", os.Getenv("cdn_url"), chapter.Hash, k.UUID)
 		}
 		pages = append(pages, link)
 
@@ -199,13 +340,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var links []*webpub.WebPubLink
 	links = append(links, &webpub.WebPubLink{
 		Relation: "self",
-		Link:     fmt.Sprintf("%s/series_chapters/%d", os.Getenv("cdn_url"), v.Id),
+		Link:     fmt.Sprintf("%s/series_chapters/%d", os.Getenv("cdn_url"), chapter.ID),
 		Type:     "application/webpub+json",
 	})
 	links = append(links, &webpub.WebPubLink{
 		Relation: "cover",
-		Link:     v.Series.CoverImage,
-		Type:     mime.TypeByExtension(filepath.Ext(strings.Replace(v.Series.CoverImage, "covers/", "", -1))),
+		Link:     chapter.SeriesChaptersSeries.CoverImage,
+		Type:     mime.TypeByExtension(filepath.Ext(strings.Replace(chapter.SeriesChaptersSeries.CoverImage, "covers/", "", -1))),
 	})
 
 	web := webpub.GenerateComicIssueWebPub(metadata, links, pages)
@@ -213,6 +354,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
 }
 

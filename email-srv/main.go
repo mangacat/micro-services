@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dchest/passwordreset"
+
 	events "github.com/mangacat/micro-services/event-structs/email"
 	"github.com/mangacat/micro-services/utils/email"
 )

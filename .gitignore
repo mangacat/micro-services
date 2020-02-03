@@ -2,3 +2,6 @@ email/email
 feed/feed
 feed-srv/feed
 email-srv/email
+email-srv/email-srv
+webpub/webpub
+email-srv/email-srv

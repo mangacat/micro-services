@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/mangacat/micro-services/utils/commento"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -14,6 +16,16 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		target = "World"
 	}
 	fmt.Fprintf(w, "Hello %s!\n", target)
+	k := &commento.Commenter{
+		// Email:    m.Email,
+		// Name:     m.Username,
+		// Password: v.Password,
+		// Website:  fmt.Sprintf("https://manga.cat/user/%d", id),
+	}
+	err = commento.CreateUser(k)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
