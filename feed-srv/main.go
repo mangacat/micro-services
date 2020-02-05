@@ -59,7 +59,7 @@ query SeriesChapters {
 	`
 	RSS_PRIVATE_GRAPHQL string = `
 query($token: uuid!) {
-  users_following_series(order_by: {users_following_series_chapters: {time_uploaded: desc}}, limit: 10, where: {users_following_series_chapters: {published: {_eq: true}}, users_following_series_user: {rss_token: {_eq: $token}}}) {
+  users_following_series(order_by: {users_following_series_chapters: {time_uploaded: desc}}, limit: 25, where: {users_following_series_chapters: {published: {_eq: true}}, users_following_series_user: {rss_token: {_eq: $token}}}) {
     users_following_series_chapters {
       id
       hash
